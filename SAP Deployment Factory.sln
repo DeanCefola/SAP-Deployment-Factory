@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27703.2018
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{151D2E53-A2C4-4D7D-83FE-D05416EBD58E}") = "SAP Deployment Factory", "SAP Deployment Factory\SAP Deployment Factory.deployproj", "{C57B01B4-0292-4C79-A905-691C7734C77B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C57B01B4-0292-4C79-A905-691C7734C77B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C57B01B4-0292-4C79-A905-691C7734C77B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C57B01B4-0292-4C79-A905-691C7734C77B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C57B01B4-0292-4C79-A905-691C7734C77B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F629C6BC-D553-45A4-B75B-72E27FC5C3C7}
+	EndGlobalSection
+EndGlobal

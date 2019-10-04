@@ -1,0 +1,80 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|AnyCPU">
+      <Configuration>Debug</Configuration>
+      <Platform>AnyCPU</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|AnyCPU">
+      <Configuration>Release</Configuration>
+      <Platform>AnyCPU</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>c57b01b4-0292-4c79-a905-691c7734c77b</ProjectGuid>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PrepareForBuildDependsOn>
+    </PrepareForBuildDependsOn>
+  </PropertyGroup>
+  <Import Condition=" Exists('Deployment.targets') " Project="Deployment.targets" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
+  <!-- vertag<:>start tokens<:>maj.min -->
+  <Import Condition=" Exists('$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Deployment\1.1\DeploymentProject.targets') " Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Deployment\1.1\DeploymentProject.targets" />
+  <!-- vertag<:>end -->
+  <ItemGroup>
+    <Content Include="asr\AzureSiteRecovery.json" />
+    <Content Include="asr\modules\azurerm.automation.1.0.3.zip" />
+    <Content Include="asr\modules\azurerm.compute.2.8.0.zip" />
+    <Content Include="asr\modules\azurerm.network.3.6.0.zip" />
+    <Content Include="asr\modules\azurerm.profile.2.7.0.zip" />
+    <Content Include="asr\modules\azurerm.resources.3.7.0.zip" />
+    <Content Include="asr\scripts\ASR-AddMultipleLoadBalancers.ps1" />
+    <Content Include="asr\scripts\ASR-AddPublicIp.ps1" />
+    <Content Include="asr\scripts\ASR-AddSingleLoadBalancer.ps1" />
+    <Content Include="asr\scripts\ASR-AddSingleNSGPublicIp.ps1" />
+    <Content Include="asr\scripts\ASR-DNS-UpdateIP.ps1" />
+    <Content Include="asr\scripts\ASR-SQL-FailoverAG.ps1" />
+    <Content Include="asr\scripts\ASR-SQL-FailoverAGClassic.ps1" />
+    <Content Include="asr\scripts\ASR-Wordpress-ChangeMysqlConfig.ps1" />
+    <Content Include="asr\scripts\SQLAGFailover.ps1" />
+    <Content Include="asr\scripts\UpdateDNS.ps1" />
+    <None Include="Deployment.targets">
+      <Visible>False</Visible>
+    </None>
+    <Content Include="Deploy-AzureResourceGroup.ps1" />
+    <Content Include="disks.ps1" />
+    <Content Include="dsc\CreateFailoverCluster.ps1.zip" />
+    <Content Include="dsc\CreateFileShareWitness.ps1.zip" />
+    <Content Include="dsc\PrepareAlwaysOnSqlServer.ps1.zip" />
+    <Content Include="Extension.json" />
+    <Content Include="factorydeploy.json" />
+    <Content Include="factorydeploy.parameters.json" />
+    <Content Include="hanastudio.ps1" />
+    <Content Include="metadata.json" />
+    <Content Include="nestedtemplates\appserver.json" />
+    <Content Include="nestedtemplates\ascs.json" />
+    <Content Include="nestedtemplates\backupprotection.json" />
+    <Content Include="nestedtemplates\databases.json" />
+    <Content Include="nestedtemplates\FileServers.json" />
+    <Content Include="nestedtemplates\fiori.json" />
+    <Content Include="nestedtemplates\JumpServer.json" />
+    <Content Include="nestedtemplates\solman.json" />
+    <Content Include="nestedtemplates\sql.json" />
+    <Content Include="nestedtemplates\sql.parameters.json" />
+    <Content Include="nestedtemplates\sqlConfigAlwaysOn.json" />
+    <Content Include="nestedtemplates\sqlPrepCluster.json" />
+    <Content Include="nestedtemplates\webdispatcher.json" />
+    <Content Include="readme.md" />
+    <Content Include="scripts\db_disks.sh" />
+    <Content Include="scripts\disks.ps1" />
+    <Content Include="scripts\disks.sh" />
+    <Content Include="scripts\hanadbinstall.sh" />
+    <Content Include="scripts\hanastudio.ps1" />
+    <Content Include="scripts\hdbinst.cfg" />
+    <Content Include="scripts\NEWCONFIG.sh" />
+    <Content Include="scripts\nfs-cluster.sh" />
+    <None Include="zz-temp.json" />
+  </ItemGroup>
+  <Target Name="GetReferenceAssemblyPaths" />
+</Project>

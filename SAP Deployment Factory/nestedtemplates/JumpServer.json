@@ -1,0 +1,439 @@
+﻿{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminPassword": {
+      "type": "string"
+    },
+    "adminUsername": {
+      "type": "string"
+    },
+    "Authentication": {
+      "type": "string"
+    },
+    "Compliance": {
+      "type": "string"
+    },
+    "Server_Count": {
+      "type": "int"
+    },
+    "hanaNumber": {
+      "type": "string"
+    },
+    "Monitor_Storage_url": {
+      "type": "string"
+    },
+    "SAPSystemId": {
+      "type": "string"
+    },
+    "ILB_INFO": {
+      "type": "object"
+    },
+    "SSH": {
+      "type": "object"
+    },
+    "SUBSCRIPTION_ENV": {
+      "type": "object"
+    },
+    "TAGS": {
+      "type": "object"
+    },
+    "VM_EXTENSIONS": {
+      "type": "object"
+    },
+    "VM_IMAGES": {
+      "type": "object"
+    },
+    "VM_SIZES": {
+      "type": "string"
+    },
+    "Templates": {
+      "type": "object"
+    }
+  },
+  "variables": {
+    "AVSetInfo": [
+      {
+        "AVSetName": "[concat(parameters('SAPSystemId'),'-AVSet-Jump')]"
+      }
+    ],
+    "Configuration_Linux": {
+      "disablePasswordAuthentication": "[if(equals(parameters('Authentication'),'sshKey'),'true','false')]",
+      "ssh": "[if(equals(parameters('Authentication'),'sshKey'),variables('SSHProfile'),json('null'))]"
+    },
+    "Configuration_Windows": {
+      "enableAutomaticUpdates": true,
+      "provisionVMAgent": true,
+      "timeZone": "[parameters('SUBSCRIPTION_ENV').timeZone]"
+    },
+    "Extension_Windows": {
+      "publisher": "Microsoft.Compute",
+      "type": "CustomScriptExtension",
+      "typeHandlerVersion": "1.9",
+      "autoUpgradeMinorVersion": true,
+      "settings": {
+        "commandToExecute": "[parameters('VM_EXTENSIONS')['HanaJump'].commandToExecute]",
+        "fileUris": [
+          "[parameters('VM_EXTENSIONS')['HanaJump'].fileUris]"
+        ]
+      }
+    },
+    "Extension_Linux": {
+      "publisher": "Microsoft.Azure.Extensions",
+      "type": "CustomScript",
+      "typeHandlerVersion": "2.0",
+      "autoUpgradeMinorVersion": true,
+      "protectedSettings": {
+        "fileUris": [
+          "[parameters('VM_EXTENSIONS')['Linux'].fileUris]"
+        ],
+        "commandToExecute": "[parameters('VM_EXTENSIONS')['Linux'].commandToExecute]"
+      }
+    },
+    "NicConfig_ILB": {
+      "ipConfigurations": [
+        {
+          "name": "ipconfig0",
+          "properties": {
+            "privateIPAllocationMethod": "Dynamic",
+            "subnet": {
+              "id": "[parameters('SUBSCRIPTION_ENV').vNET_Subnets_Mgmt]"
+            },
+            "applicationSecurityGroups": [
+              {
+                "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-Jump-ASG'))]"
+              }
+            ],
+            "loadBalancerBackendAddressPools": [
+              {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Jump')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_Jump-BackEnd'))]"
+              }
+            ]
+          }
+        }
+      ],
+      "enableAcceleratedNetworking": true,
+      "networkSecurityGroup": {
+        "id": "[resourceId('Microsoft.Network/networkSecurityGroups',concat(parameters('SAPSystemId'),'-Jump-NSG'))]"
+      }
+    },
+    "NicConfig_noILB": {
+      "ipConfigurations": [
+        {
+          "name": "ipconfig0",
+          "properties": {
+            "privateIPAllocationMethod": "Dynamic",
+            "subnet": {
+              "id": "[parameters('SUBSCRIPTION_ENV').vNET_Subnets_Mgmt]"
+            },
+            "applicationSecurityGroups": [
+              {
+                "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-Jump-ASG'))]"
+              }
+            ],
+            "publicIPAddress": {
+              "id": "[resourceId('Microsoft.Network/publicIPAddresses', concat(parameters('SAPSystemId'),'-Jump-PIP'))]"
+            }
+          }
+        }
+      ],
+      "enableAcceleratedNetworking": true,
+      "networkSecurityGroup": {
+        "id": "[resourceId('Microsoft.Network/networkSecurityGroups',concat(parameters('SAPSystemId'),'-Jump-NSG'))]"
+      }
+    },
+    "SSHProfile": {
+      "publicKeys": [
+        {
+          "path": "[parameters('SSH').sshKeyPath]",
+          "keyData": "[parameters('SSH').sshKeyData]"
+        }
+      ]
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "[variables('AVSetInfo')[copyIndex()].AVSetName]",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "Jump-AVSet-Copy",
+        "count": "[length(variables('AVSetInfo'))]"
+      },
+      "tags": {
+        "displayName": "Jump AvSet",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "sku": {
+        "name": "Aligned"
+      },
+      "properties": {
+        "platformUpdateDomainCount": 5,
+        "platformFaultDomainCount": 2
+      },
+      "dependsOn": [
+
+      ]
+    },
+    {
+      "type": "Microsoft.Network/applicationSecurityGroups",
+      "name": "[concat(parameters('SAPSystemId'),'-Jump-ASG')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "Jump-Asg-Copy",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "Jump ASG",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "scale": null,
+      "dependsOn": [
+
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[concat(parameters('SAPSystemId'),'-Jump-NSG')]",
+      "apiVersion": "2018-01-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "Jump-Nsg-Copy",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "Jump NSG",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "ALLOW--RDP-JumpServer--INBOUND",
+            "properties": {
+              "description": "Allow RDP to Jump Server",
+              "protocol": "TCP",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Outbound",
+              "sourcePortRange": "3389",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+
+          {
+            "name": "ALLOW--Azure_Storage--OUTBOUND",
+            "properties": {
+              "description": "Allow Azure Backup",
+              "protocol": "TCP",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "[concat('Storage', '.', resourceGroup().location)]",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Outbound",
+              "sourcePortRanges": [
+                "8443",
+                "3260"
+              ],
+              "destinationPortRanges": [
+                "8443",
+                "3260"
+              ],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "Jump-Asg-Copy"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[concat(parameters('SAPSystemId'), '-Jump-PIP')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "Jump-PIP-Copy",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "Jump PIP",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "publicIPAddressVersion": "IPv4",
+        "publicIPAllocationMethod": "Static",
+        "idleTimeoutInMinutes": 4
+      },
+      "dependsOn": [
+
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('SAPSystemId'),'-Jump',copyIndex(),'-vm-nic0')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "Jump-Nic-Copy0",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "Jump Nic0",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "properties": "[if(equals(parameters('Server_Count'),1),variables('NicConfig_noILB'),variables('NicConfig_ILB'))]",
+      "dependsOn": [
+        "Jump-Nsg-Copy",
+        "[if(equals(parameters('Server_Count'),1),'Jump-AVSet-Copy','Jump-ILB-Copy')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[concat(parameters('SAPSystemId'),'-Jump',copyIndex(),'-vm')]",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "Jump-VM-Copy",
+        "count": "[parameters('Server_Count')]"
+      },
+      "tags": {
+        "displayName": "Jump VM",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "properties": {
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets', concat(parameters('SAPSystemId'),'-AVSet-Jump'))]"
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[parameters('Monitor_Storage_url')]"
+          }
+        },
+        "hardwareProfile": {
+          "vmSize": "[parameters('VM_SIZES')]"
+        },
+        "osProfile": {
+          "computerName": "[concat(parameters('SAPSystemId'),'-Jump-vm-',copyIndex())]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": "[if(equals(parameters('VM_IMAGES').OperatingSystem, 'Linux'), variables('Configuration_Windows'), json('null'))]",
+          "customData": "[if(equals(parameters('VM_IMAGES').OperatingSystem, 'Linux'), parameters('VM_EXTENSIONS')['Windows'].customData, parameters('VM_EXTENSIONS')['Windows'].customData)]"
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('SAPSystemId'),'-Jump',copyIndex(),'-vm-nic0'))]",
+              "properties": {
+              }
+            }
+          ]
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[parameters('VM_IMAGES').Publisher]",
+            "offer": "[parameters('VM_IMAGES').Offer]",
+            "sku": "[parameters('VM_IMAGES').Sku]",
+            "version": "[parameters('VM_IMAGES').Version]"
+          },
+          "osDisk": {
+            "osType": "[parameters('VM_IMAGES').OperatingSystem]",
+            "createOption": "FromImage",
+            "name": "[concat(parameters('SAPSystemId'),'-Jump',copyIndex(), '-vm-OSDisk')]",
+            "caching": "ReadWrite",
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+            }
+          },
+          "dataDisks": [
+            {
+              "name": "[concat(parameters('SAPSystemId'),'-Jump',copyIndex(),'-vm-DataDisk0')]",
+              "lun": 0,
+              "createOption": "Empty",
+              "diskSizeGB": 32,
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"                
+              }
+            }
+          ]
+        },
+        "licenseType": "[if(equals(parameters('VM_IMAGES').OperatingSystem,'Windows'), 'Windows_Server',json('null'))]"
+      },
+      "dependsOn": [
+        "Jump-Nic-Copy0"
+      ],
+      "resources": [
+        {
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('SAPSystemId'),'-Jump',copyIndex(),'-vm','/', 'HANA-Install')]",
+          "location": "[resourceGroup().location]",
+          "apiVersion": "2015-06-15",
+          "tags": {
+            "displayName": "VmExtension"
+          },
+          "properties": "[if(equals(parameters('VM_IMAGES').OperatingSystem, 'Windows'), variables('Extension_Windows'), variables('Extension_Windows'))]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines',concat(parameters('SAPSystemId'),'-Jump',copyIndex(),'-vm'))]"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('Jump_Backup-', copyIndex())]",
+      "apiVersion": "2017-05-10",
+      "copy": {
+        "name": "Backup-Copy",
+        "count": "[parameters('Server_Count')]"
+      },
+      "subscriptionId": "[parameters('SUBSCRIPTION_ENV').ID]",
+      "resourceGroup": "[parameters('SUBSCRIPTION_ENV').Backup_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[parameters('Templates')['Backup'].Link]"
+        },
+        "parameters": {
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "VMName": {
+            "value": "[concat(parameters('SAPSystemId'),'-Jump',copyIndex(),'-vm')]"
+          },
+          "VM_RGName": {
+            "value": "[parameters('SUBSCRIPTION_ENV').SAP_RGName]"
+          },
+          "vaultName": {
+            "value": "[parameters('SUBSCRIPTION_ENV').Backup_VaultName]"
+          },
+          "Subscription_ID": {
+            "value": "[parameters('SUBSCRIPTION_ENV').ID]"
+          }
+        }
+      },
+      "dependsOn": [
+        "Jump-VM-Copy"
+      ]
+    }
+  ],
+  "outputs": {
+ 
+  }
+}

@@ -1,0 +1,39 @@
+﻿{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+  "parameters": {
+    "SAPSystemId": {
+      "value": "zx9"
+    },
+    "DataBaseSize": {
+      "value": "HLI"
+    },
+    "AppServerCount": {
+      "value": 0
+    },
+    "WebDispatcherCount": {
+      "value": 0
+    },
+    "FIORICount": {
+      "value": 0
+    },    
+    "OperatingSystem": {
+      "value": "SLES"
+    },
+    "Build_Jump_Server?": {
+      "value": false
+    },
+    "FileServerCount": {
+      "value": 0
+    },
+    "SolManCount": {
+      "value": 0
+    },
+    "Environment": {
+      "value": "Sandbox"
+    },
+    "Compliance": {
+      "value": "HIPPA"
+    }
+  }
+}

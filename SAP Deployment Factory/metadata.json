@@ -1,0 +1,7 @@
+﻿{
+  "itemDisplayName": "Azure SAP Offering Deployment",
+  "description": "Master deployment template with multiple nested templates to deploy, vNET, storage, NVA_Cisco, NVA_Paloalto, Domain, DFS, RDSFarm, SIOS datakeeper, multiple SAP modules",
+  "summary": "SAP can deploy to windows or Suse linux on SQL or HANA",
+  "githubUsername": "drcefola",
+  "dateUpdated": "2018-01-15"
+}

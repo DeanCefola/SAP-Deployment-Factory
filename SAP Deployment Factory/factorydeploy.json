@@ -1,0 +1,1599 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "_artifactsLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "Auto-generated container in staging storage account to receive post-build staging folder upload"
+      }
+    },
+    "_artifactsLocationSasToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Auto-generated token to access _artifactsLocation"
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Admin password for VMs"
+      }
+    },
+    "Subscription": {
+      "type": "string",
+      "allowedValues": [
+        "YOURSUBSCRIPTION",
+        "MSDean"
+      ],
+      "defaultValue": "MSDean"
+    },
+    "SAPSystemId": {
+      "type": "string",
+      "maxLength": 3,
+      "minLength": 3,
+      "metadata": {
+        "description": "SAP System ID."
+      },
+      "defaultValue": "WC3"
+    },
+    "Environment": {
+      "type": "string",
+      "allowedValues": [
+        "Sandbox",
+        "Dev",
+        "QA",
+        "Perf",
+        "Prod"
+      ],
+      "defaultValue": "Sandbox"
+    },
+    "hanaNumber": {
+      "type": "string",
+      "defaultValue": "00"
+    },
+    "Compliance": {
+      "type": "string",
+      "allowedValues": [
+        "HIPPA",
+        "PCI",
+        "SOX",
+        "ProdBasic",
+        "Non-ProdBasic"
+      ],
+      "defaultValue": "Non-ProdBasic",
+      "metadata": {
+        "description": "Determines Compliance Policy for Backup"
+      }
+    },
+    "OperatingSystem": {
+      "type": "string",
+      "allowedValues": [
+        "Windows",
+        "SLES",
+        "RHEL"
+      ],
+      "defaultValue": "SLES"
+    },
+    "Authentication": {
+      "type": "string",
+      "allowedValues": [
+        "Password",
+        "sshKey"
+      ],
+      "defaultValue": "Password",
+      "metadata": {
+        "description": "Select Authentication method for All VMs in this deployment"
+      }
+    },
+    "DataBaseSize": {
+      "type": "string",
+      "allowedValues": [
+        "Demo",
+        "Small",
+        "Medium",
+        "Large",
+        "X-Large",
+        "HLI"
+      ],
+      "defaultValue": "Small"
+    },
+    "AppServerCount": {
+      "type": "int",
+      "minValue": 0,
+      "maxValue": 100,
+      "defaultValue": 4,
+      "metadata": {
+        "description": "The number of App Servers to be deployed."
+      }
+    },
+    "WebDispatcherCount": {
+      "type": "int",
+      "minValue": 0,
+      "maxValue": 10,
+      "defaultValue": 2,
+      "metadata": {
+        "description": "The number of WebDispatchers to be deployed."
+      }
+    },
+    "FIORICount": {
+      "type": "int",
+      "minValue": 0,
+      "maxValue": 2,
+      "defaultValue": 1,
+      "metadata": {
+        "description": "The number of Fiori Servers to be deployed."
+      }
+    },
+    "SolManCount": {
+      "type": "int",
+      "minValue": 0,
+      "maxValue": 2,
+      "defaultValue": 0,
+      "metadata": {
+        "description": "The number of Fiori Servers to be deployed."
+      }
+    },
+    "FileServerCount": {
+      "type": "int",
+      "minValue": 0,
+      "maxValue": 8,
+      "defaultValue": 0,
+      "metadata": {
+        "description": "The number of File Servers, Linux NFS or Winodws SOFS to be deployed."
+      }
+    },
+    "Build_Jump_Server?": {
+      "type": "bool",
+      "allowedValues": [
+        true,
+        false
+      ],
+      "defaultValue": true
+    }
+  },
+  "variables": {
+    "SUBSCRIPTION_ENV": {
+      "<Your Sub Name 1>": {
+        "ID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        "timeZone": "Eastern Standard Time",
+        "SapBitsURI": "https://ENTER_YOUR_URI_TO_SAP_FILES.blob.core.windows.net/",
+        "adminUserName": "[concat(tolower(parameters('SAPSystemId')),'admin')]",
+        "Monitor_Storage_url": "[concat('http://', tolower(parameters('SAPSystemId')) ,'monitor01.blob.core.windows.net')]",
+        "SAP_RGName": "[concat(tolower(parameters('SAPSystemId')),'-RG-sap')]",
+        "Backup_RGName": "[concat(tolower(parameters('SAPSystemId')),'-RG-security')]",
+        "Backup_VaultName": "[concat(tolower(parameters('SAPSystemId')),'-BackupVault')]",
+        "ASR_RGName": "[concat(tolower(parameters('SAPSystemId')),'-RG-DisasterRecovery')]",
+        "vNET_ID": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'))]",
+        "vNET_Subnets_Web": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Web')]",
+        "vNET_Subnets_ASCS": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/App')]",
+        "vNET_Subnets_App": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/App')]",
+        "vNET_Subnets_Database": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Database')]",
+        "vNET_Subnets_Mgmt": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Tools')]",
+        "vNET_Subnets_Fiori": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Tools')]",
+        "vNET_Subnets_SolMan": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Tools')]",
+        "vNET_Subnets_FileServers": "[concat('/subscriptions/3a8206a1-e9f3-44a2-84f0-e532b9862258/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Tools')]"
+      },
+      "<Your Sub Name 2>": {
+        "ID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        "timeZone": "Eastern Standard Time",
+        "SapBitsURI": "https://ENTER_YOUR_URI_TO_SAP_FILES.blob.core.windows.net/",
+        "adminUserName": "[concat(tolower(parameters('SAPSystemId')),'admin')]",
+        "Monitor_Storage_url": "[concat('http://', tolower(parameters('SAPSystemId')) ,'monitor01.blob.core.windows.net')]",
+        "SAP_RGName": "[concat(tolower(parameters('SAPSystemId')),'-RG-sap')]",
+        "Backup_RGName": "[concat(tolower(parameters('SAPSystemId')),'-RG-security')]",
+        "Backup_VaultName": "[concat(tolower(parameters('SAPSystemId')),'-BackupVault')]",
+        "ASR_RGName": "[concat(tolower(parameters('SAPSystemId')),'-RG-DisasterRecovery')]",
+        "vNET_ID": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'))]",
+        "vNET_Subnets_Web": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Web')]",
+        "vNET_Subnets_ASCS": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/App')]",
+        "vNET_Subnets_App": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/App')]",
+        "vNET_Subnets_Database": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Database')]",
+        "vNET_Subnets_Mgmt": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Tools')]",
+        "vNET_Subnets_Fiori": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Tools')]",
+        "vNET_Subnets_SolMan": "[concat('/subscriptions/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Tools')]",
+        "vNET_Subnets_FileServers": "[concat('/subscriptions/3a8206a1-e9f3-44a2-84f0-e532b9862258/resourceGroups/',concat(tolower(parameters('SAPSystemId')),'-RG-vnets'),'/providers/Microsoft.Network/virtualNetworks/',concat(tolower(parameters('SAPSystemId')),'-Spoke00'),'/subnets/Tools')]"
+      }
+    },
+    "SAP_ENV": {
+      "Sandbox": {
+        "Name": "Sandbox",
+        "DR": "no",
+        "Database": 1,
+        "ASCS": 0,
+        "Jump": 1,
+        "WebDispatcher": "[parameters('WebDispatcherCount')]",
+        "AppServer": "[parameters('AppServerCount')]",
+        "Fiori": "[parameters('FIORICount')]",
+        "SolMan": "[parameters('SolManCount')]",
+        "FileServer": "[parameters('FileServerCount')]"
+      },
+      "Dev": {
+        "Name": "Dev",
+        "DR": "no",
+        "Database": 1,
+        "ASCS": 1,
+        "Jump": 1,
+        "WebDispatcher": "[parameters('WebDispatcherCount')]",
+        "AppServer": "[parameters('AppServerCount')]",
+        "Fiori": "[parameters('FIORICount')]",
+        "SolMan": "[parameters('SolManCount')]",
+        "FileServer": "[parameters('FileServerCount')]"
+      },
+      "QA": {
+        "Name": "QA",
+        "DR": "no",
+        "Database": 1,
+        "ASCS": 1,
+        "Jump": 1,
+        "WebDispatcher": "[parameters('WebDispatcherCount')]",
+        "AppServer": "[parameters('AppServerCount')]",
+        "Fiori": "[parameters('FIORICount')]",
+        "SolMan": "[parameters('SolManCount')]",
+        "FileServer": "[parameters('FileServerCount')]"
+      },
+      "Perf": {
+        "Name": "Perf",
+        "DR": "no",
+        "Database": 2,
+        "ASCS": 2,
+        "Jump": 1,
+        "WebDispatcher": "[parameters('WebDispatcherCount')]",
+        "AppServer": "[parameters('AppServerCount')]",
+        "Fiori": "[parameters('FIORICount')]",
+        "SolMan": "[parameters('SolManCount')]",
+        "FileServer": "[parameters('FileServerCount')]"
+      },
+      "Prod": {
+        "Name": "Prod",
+        "DR": "yes",
+        "Database": 2,
+        "ASCS": 2,
+        "Jump": 1,
+        "WebDispatcher": "[parameters('WebDispatcherCount')]",
+        "AppServer": "[parameters('AppServerCount')]",
+        "Fiori": "[parameters('FIORICount')]",
+        "SolMan": "[parameters('SolManCount')]",
+        "FileServer": "[parameters('FileServerCount')]"
+      }
+    },
+    "ILB_INFO": {
+      "DB-ILB": {
+        "Name": "[concat(parameters('SAPSystemId'), '_LB_DB')]",
+        "frontendIPConfigurations": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_DB-FrontEnd')]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_Subnets_Database]"
+              },
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_DB')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_DB-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_DB-BackEnd')]",
+            "properties": {
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_DB')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_DB-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_DB-Rule-SAP')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_DB')),'/frontendIPConfigurations/',concat(parameters('SAPSystemId'), '_LB_DB-FrontEnd'))]"
+              },
+              "frontendPort": 0,
+              "backendPort": 0,
+              "enableFloatingIP": true,
+              "idleTimeoutInMinutes": 30,
+              "protocol": "All",
+              "loadDistribution": "SourceIPProtocol",
+              "disableOutboundSnat": false,
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_DB')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_DB-BackEnd'))]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_DB')),'/probes/',concat(parameters('SAPSystemId'), '_LB_DB-Probe'))]"
+              }
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_DB-Probe')]",
+            "properties": {
+              "protocol": "Tcp",
+              "port": 59999,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2,
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_DB')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_DB-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "inboundNatRules": [
+
+        ],
+        "inboundNatPools": [
+
+        ]
+      },
+      "Ascs-ILB": {
+        "Name": "[concat(parameters('SAPSystemId'), '_LB_ASCS')]",
+        "frontendIPConfigurations": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_ASCS-FrontEnd')]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_Subnets_ASCS]"
+              },
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_ASCS')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_ASCS-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_ASCS-BackEnd')]",
+            "properties": {
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_ASCS')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_ASCS-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_ASCS-Rule-SAP')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_ASCS')),'/frontendIPConfigurations/',concat(parameters('SAPSystemId'), '_LB_ASCS-FrontEnd'))]"
+              },
+              "frontendPort": 0,
+              "backendPort": 0,
+              "enableFloatingIP": true,
+              "idleTimeoutInMinutes": 30,
+              "protocol": "All",
+              "loadDistribution": "SourceIPProtocol",
+              "disableOutboundSnat": false,
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_ASCS')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_ASCS-BackEnd'))]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_ASCS')),'/probes/',concat(parameters('SAPSystemId'), '_LB_ASCS-Probe'))]"
+              }
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_ASCS-Probe')]",
+            "properties": {
+              "protocol": "Tcp",
+              "port": 59990,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2,
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_ASCS')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_ASCS-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "inboundNatRules": [
+
+        ],
+        "inboundNatPools": [
+
+        ]
+      },
+      "App-ILB": {
+        "Name": "[concat(parameters('SAPSystemId'), '_LB_App')]",
+        "frontendIPConfigurations": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_App-FrontEnd')]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_Subnets_App]"
+              },
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_App')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_App-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_App-BackEnd')]",
+            "properties": {
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_App')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_App-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_App-Rule-SAP')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_App')),'/frontendIPConfigurations/',concat(parameters('SAPSystemId'), '_LB_App-FrontEnd'))]"
+              },
+              "frontendPort": 0,
+              "backendPort": 0,
+              "enableFloatingIP": true,
+              "idleTimeoutInMinutes": 30,
+              "protocol": "All",
+              "loadDistribution": "SourceIPProtocol",
+              "disableOutboundSnat": false,
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_App')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_App-BackEnd'))]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_App')),'/probes/',concat(parameters('SAPSystemId'), '_LB_App-Probe'))]"
+              }
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_App-Probe')]",
+            "properties": {
+              "protocol": "Tcp",
+              "port": 59999,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2,
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_App')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_App-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "inboundNatRules": [
+
+        ],
+        "inboundNatPools": [
+
+        ]
+      },
+      "Web-ILB": {
+        "Name": "[concat(parameters('SAPSystemId'), '_LB_Web')]",
+        "frontendIPConfigurations": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_Web-FrontEnd')]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_Subnets_Web]"
+              },
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Web')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_Web-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_Web-BackEnd')]",
+            "properties": {
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Web')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_Web-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_Web-Rule-SAP')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Web')),'/frontendIPConfigurations/',concat(parameters('SAPSystemId'), '_LB_Web-FrontEnd'))]"
+              },
+              "frontendPort": 0,
+              "backendPort": 0,
+              "enableFloatingIP": true,
+              "idleTimeoutInMinutes": 30,
+              "protocol": "All",
+              "loadDistribution": "SourceIPProtocol",
+              "disableOutboundSnat": false,
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Web')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_Web-BackEnd'))]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Web')),'/probes/',concat(parameters('SAPSystemId'), '_LB_Web-Probe'))]"
+              }
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_Web-Probe')]",
+            "properties": {
+              "protocol": "Tcp",
+              "port": 59999,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2,
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Web')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_Web-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "inboundNatRules": [
+
+        ],
+        "inboundNatPools": [
+
+        ]
+      },
+      "Fiori-ILB": {
+        "Name": "[concat(parameters('SAPSystemId'), '_LB_Fiori')]",
+        "frontendIPConfigurations": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_Fiori-FrontEnd')]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_Subnets_Fiori]"
+              },
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Fiori')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_Fiori-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_Fiori-BackEnd')]",
+            "properties": {
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Fiori')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_Fiori-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_Fiori-Rule-SAP')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Fiori')),'/frontendIPConfigurations/',concat(parameters('SAPSystemId'), '_LB_Fiori-FrontEnd'))]"
+              },
+              "frontendPort": 0,
+              "backendPort": 0,
+              "enableFloatingIP": true,
+              "idleTimeoutInMinutes": 30,
+              "protocol": "All",
+              "loadDistribution": "SourceIPProtocol",
+              "disableOutboundSnat": false,
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Fiori')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_Fiori-BackEnd'))]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Fiori')),'/probes/',concat(parameters('SAPSystemId'), '_LB_Fiori-Probe'))]"
+              }
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_Fiori-Probe')]",
+            "properties": {
+              "protocol": "Tcp",
+              "port": 59999,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2,
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_Fiori')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_Fiori-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "inboundNatRules": [
+
+        ],
+        "inboundNatPools": [
+
+        ]
+      },
+      "SolMan-ILB": {
+        "Name": "[concat(parameters('SAPSystemId'), '_LB_SolMan')]",
+        "frontendIPConfigurations": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_SolMan-FrontEnd')]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_Subnets_SolMan]"
+              },
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_SolMan')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_SolMan-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_SolMan-BackEnd')]",
+            "properties": {
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_SolMan')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_SolMan-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_SolMan-Rule-SAP')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_SolMan')),'/frontendIPConfigurations/',concat(parameters('SAPSystemId'), '_LB_SolMan-FrontEnd'))]"
+              },
+              "frontendPort": 0,
+              "backendPort": 0,
+              "enableFloatingIP": true,
+              "idleTimeoutInMinutes": 30,
+              "protocol": "All",
+              "loadDistribution": "SourceIPProtocol",
+              "disableOutboundSnat": false,
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_SolMan')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_SolMan-BackEnd'))]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_SolMan')),'/probes/',concat(parameters('SAPSystemId'), '_LB_SolMan-Probe'))]"
+              }
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_SolMan-Probe')]",
+            "properties": {
+              "protocol": "Tcp",
+              "port": 59999,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2,
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_SolMan')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_SolMan-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "inboundNatRules": [
+
+        ],
+        "inboundNatPools": [
+
+        ]
+      },
+      "File-ILB": {
+        "Name": "[concat(parameters('SAPSystemId'), '_LB_File')]",
+        "frontendIPConfigurations": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_File-FrontEnd')]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_Subnets_FileServers]"
+              },
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_File')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_File-Rule-SQL'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_File-BackEnd')]",
+            "properties": {
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_File')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_File-Rule-SAP'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_File-Rule-SQL')]",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_File')),'/frontendIPConfigurations/',concat(parameters('SAPSystemId'), '_LB_File-FrontEnd'))]"
+              },
+              "frontendPort": 0,
+              "backendPort": 0,
+              "enableFloatingIP": true,
+              "idleTimeoutInMinutes": 30,
+              "protocol": "All",
+              "loadDistribution": "SourceIPProtocol",
+              "disableOutboundSnat": false,
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_File')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_File-BackEnd'))]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_File')),'/probes/',concat(parameters('SAPSystemId'), '_LB_File-Probe'))]"
+              }
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "[concat(parameters('SAPSystemId'), '_LB_File-Probe')]",
+            "properties": {
+              "protocol": "Tcp",
+              "port": 59999,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2,
+              "loadBalancingRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_File')),'/loadBalancingRules/',concat(parameters('SAPSystemId'), '_LB_File-Rule-SQL'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "inboundNatRules": [
+
+        ],
+        "inboundNatPools": [
+
+        ]
+      }
+    },
+    "SSH": {
+      "sshKeyPath": "[if(equals(parameters('Authentication'),'sshKey'),concat('/home/',variables('SUBSCRIPTION_ENV')['adminUserName'],'/.ssh/authorized_keys'),'false')]",
+      "sshKeyData": "[if(equals(parameters('Authentication'),'sshKey'),'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCeClRAk2ipUs/l5voIsDC5q9RI+YSRd1Bvd/O+axgY4WiBzG+4FwJWZm/mLLe5DoOdHQwmU2FrKXZSW4w2sYE70KeWnrFViCOX5MTVvJgPE8ClugNl8RWth/tU849DvM9sT7vFgfVSHcAS2yDRyDlueii+8nF2ym8XWAPltFVCyLHRsyBp5YPqK8JFYIa1eybKsY3hEAxRCA+/7bq8et+Gj3coOsuRmrehav7rE6N12Pb80I6ofa6SM5XNYq4Xk0iYNx7R3kdz0Jj9XgZYWjAHjJmT0gTRoOnt6upOuxK7xI/ykWrllgpXrCPu3Ymz+c+ujaqcxDopnAl2lmf69/J1','false')]"
+    },
+    "TAGS": {
+      "SAP_Application": "[parameters('SAPSystemId')]",
+      "SAP_Environment": "[variables('SAP_Env')[parameters('Environment')].Name]",
+      "Organization": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "UserName": "mary",
+      "Email": "mary@contoso.com",
+      "Application": "SAP",
+      "GLAccount": "622"
+    },
+    "TEMPLATES": {
+      "Database": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/databases.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "AppServer": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/appserver.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "ASCS": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/ascs.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "Fiori": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/fiori.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "WebDispatcher": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/webdispatcher.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "SolMan": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/solman.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "FileServer": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/FileServers.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "JumpServer": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/JumpServer.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "Backup": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/nestedtemplates/backupprotection.json', parameters('_artifactsLocationSasToken'))]"
+      },
+      "ASR": {
+        "Link": "[concat(parameters('_artifactsLocation'), '/ASR/AzureSiteRecovery.json', parameters('_artifactsLocationSasToken'))]"
+      }
+    },
+    "VM_IMAGES": {
+      "Windows": {
+        "OperatingSystem": "Windows",
+        "publisher": "MicrosoftWindowsServer",
+        "offer": "WindowsServer",
+        "sku": "2016-Datacenter",
+        "version": "latest"
+      },
+      "SLES": {
+        "OperatingSystem": "Linux",
+        "publisher": "SUSE",
+        "offer": "SLES-SAP",
+        "sku": "12-SP3",
+        "version": "latest"
+      },
+      "RHEL": {
+        "OperatingSystem": "Linux",
+        "publisher": "RedHat",
+        "offer": "RHEL",
+        "sku": "7.4",
+        "version": "latest"
+      }
+    },
+    "VM_SIZES": {
+      "Demo": {
+        "DBsize": "Standard_F4s_v2",
+        "WebSize": "Standard_F2s",
+        "ASCSSize": "Standard_F2s",
+        "AppSize": "Standard_F2s",
+        "FioriSize": "Standard_F2s",
+        "SolManSize": "Standard_F2s",
+        "NSFSize": "Standard_F2s",
+        "JumpSize": "Standard_F2s",
+        "scriptArguments": "sudo bash disks.sh -luns '0#,1#,2#,3#,4#' -names 'data#log#shared#usrsap#backup' -paths '/hana/data#/hana/log#/hana/shared#/usr/sap#/hana/backup'  -sizes '100#100#100#100#100'",
+        "sapscriptArguments": "sudo bash disks.sh -luns '0#' -names 'data#' -paths '/hana/data#'  -sizes '100#'"
+      },
+      "Small": {
+        "DBsize": "Standard_E16s_v3",
+        "WebSize": "Standard_F2s",
+        "ASCSSize": "Standard_D32s_v3",
+        "AppSize": "Standard_D32s_v3",
+        "FioriSize": "Standard_F2s",
+        "SolManSize": "Standard_F2s",
+        "NSFSize": "Standard_F2s",
+        "JumpSize": "Standard_F2s",
+        "scriptArguments": "sudo bash disks.sh -luns 0,1#,2#,3#,4#,5# -names 'data#log#shared#usrsap#backup' -paths '/hana/data#/hana/log#/hana/shared#/usr/sap#/hana/backup'  -sizes '100#100#100#100#100'",
+        "SapscriptArguments": "sudo bash disks.sh -luns '0#' -names 'data#' -paths '/hana/data#'  -sizes '100#'"
+      },
+      "Medium": {
+        "DBsize": "Standard_E32s_v3",
+        "WebSize": "Standard_F2s",
+        "ASCSSize": "Standard_D32s_v3",
+        "AppSize": "Standard_D32s_v3",
+        "FioriSize": "Standard_F2s",
+        "SolManSize": "Standard_F2s",
+        "NSFSize": "Standard_F2s",
+        "JumpSize": "Standard_F2s",
+        "scriptArguments": "sudo bash disks.sh -luns 0,1#,2,3#,4#,5#,6,7 -names 'data#log#shared#usrsap#backup' -paths '/hana/data#/hana/log#/hana/shared#/usr/sap#/hana/backup'  -sizes '100#100#100#100#100'",
+        "SapscriptArguments": "sudo bash disks.sh -luns '0#' -names 'data#' -paths '/hana/data#'  -sizes '100#'"
+      },
+      "Large": {
+        "DBsize": "Standard_E64s_v3",
+        "WebSize": "Standard_F2s",
+        "ASCSSize": "Standard_D32s_v3",
+        "AppSize": "Standard_D32s_v3",
+        "FioriSize": "Standard_F2s",
+        "SolManSize": "Standard_F2s",
+        "NSFSize": "Standard_F2s",
+        "JumpSize": "Standard_F2s",
+        "scriptArguments": "sudo bash disks.sh -luns 0,1,2#,3,4#,5#,6#,7,8# -names 'data#log#shared#usrsap#backup' -paths '/hana/data#/hana/log#/hana/shared#/usr/sap#/hana/backup'  -sizes '100#100#100#100#100'",
+        "SapscriptArguments": "sudo bash disks.sh -luns '0#' -names 'data#' -paths '/hana/data#'  -sizes '100#'"
+      },
+      "X-Large": {
+        "DBsize": "Standard_M128ms",
+        "WebSize": "Standard_F2s",
+        "ASCSSize": "Standard_D32s_v3",
+        "AppSize": "Standard_D32s_v3",
+        "FioriSize": "Standard_F2s",
+        "SolManSize": "Standard_F2s",
+        "NSFSize": "Standard_F2s",
+        "JumpSize": "Standard_F2s",
+        "scriptArguments": "sudo bash disks.sh -luns 0,1,2,3,4#,5,6#,7#,8#,9,10# -names 'data#log#shared#usrsap#backup' -paths '/hana/data#/hana/log#/hana/shared#/usr/sap#/hana/backup'  -sizes '100#100#100#100#100'",
+        "SapscriptArguments": "sudo bash disks.sh -luns '0#' -names 'data#' -paths '/hana/data#'  -sizes '100#'"
+      },
+      "HLI": {
+        "DBsize": "HLI",
+        "WebSize": "Standard_F2s",
+        "ASCSSize": "Standard_D32s_v3",
+        "AppSize": "Standard_D32s_v3",
+        "FioriSize": "Standard_F2s",
+        "SolManSize": "Standard_F2s",
+        "NSFSize": "Standard_F2s",
+        "JumpSize": "Standard_F2s",
+        "scriptArguments": "",
+        "SapscriptArguments": "sudo bash disks.sh -luns '0#' -names 'data#' -paths '/hana/data#'  -sizes '100#'"
+      }
+    },
+    "VM_EXTENSIONS": {
+      "Windows": {
+        "fileUris": "[concat(parameters('_artifactsLocation'),'/disks.ps1',parameters('_artifactsLocationSasToken'))]",
+        "commandToExecute": "powershell.exe -executionpolicy unrestricted -file disks.ps1",
+        "customData": "JABmAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgAD0AIAAiAFMAQQBQAFMAdABvAHIAYQBnAGUAUABvAG8AbAAiADsAIAANAAoAJABDAGEAbgBwAG8AbwBsAGQAaQBzAGsAcwAgAD0AIABHAGUAdAAtAFAAaAB5AHMAaQBjAGEAbABEAGkAcwBrACAAfAA/ACAAewAkAF8ALgBDAGEAbgBQAG8AbwBsACAALQBlAHEAIAAkAHQAcgB1AGUAfQA7AA0ACgBOAGUAdwAtAFMAdABvAHIAYQBnAGUAUABvAG8AbAAgAC0AUwB0AG8AcgBhAGcAZQBTAHUAYgBTAHkAcwB0AGUAbQBGAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgACIAKgBTAHQAbwByAGEAZwBlACoAIgAgAC0ARgByAGkAZQBuAGQAbAB5AE4AYQBtAGUAIAAkAGYAcgBpAGUAbgBkAGwAeQBOAGEAbQBlACAALQBQAGgAeQBzAGkAYwBhAGwARABpAHMAawBzACAAJABDAGEAbgBwAG8AbwBsAGQAaQBzAGsAcwA7AA0ACgAkAEQAaQBzAGsAcwAgAD0AIABAACgAQAB7AE4AYQBtAGUAPQAiAEwAbwBnAHMAIgA7AFMAaQB6AGUAPQA1ADEAMgBHAEIAOwBMAGUAdAB0AGUAcgA9ACIATAAiAH0AOwBAAHsATgBhAG0AZQA9ACIAUwBBAFAAIgA7AFMAaQB6AGUAPQA2ADQARwBCADsATABlAHQAdABlAHIAPQAiAFMAIgB9ADsAQAB7AE4AYQBtAGUAPQAiAEQAYQB0AGEAIgA7AFMAaQB6AGUAPQA1ADEAMgAwAEcAQgA7AEwAZQB0AHQAZQByAD0AIgBUACIAfQA7AEAAewBOAGEAbQBlAD0AIgBTAGgAYQByAGUAZAAiADsAUwBpAHoAZQA9ADEAMAAyADQARwBCADsATABlAHQAdABlAHIAPQAiAFgAIgB9ADsAQAB7AE4AYQBtAGUAPQAiAEIAYQBjAGsAdQBwACIAOwBTAGkAegBlAD0ANQAxADIAMABHAEIAOwBMAGUAdAB0AGUAcgA9ACIAWgAiAH0AOwApADsAIAANAAoAZgBvAHIAZQBhAGMAaAAgACgAJABkAGkAcwBrACAAaQBuACAAJABkAGkAcwBrAHMAKQAgAHsAJAB2AGQAIAA9ACAATgBlAHcALQBWAGkAcgB0AHUAYQBsAEQAaQBzAGsAIAAtAFMAdABvAHIAYQBnAGUAUABvAG8AbABGAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgACQAZgByAGkAZQBuAGQAbAB5AE4AYQBtAGUAIAAtAEYAcgBpAGUAbgBkAGwAeQBOAGEAbQBlACAAJABkAGkAcwBrAC4ATgBhAG0AZQAgAC0AUwBpAHoAZQAgACQAZABpAHMAawAuAFMAaQB6AGUAIAAtAFIAZQBzAGkAbABpAGUAbgBjAHkAUwBlAHQAdABpAG4AZwBOAGEAbQBlACAAUwBpAG0AcABsAGUAIAAtAFAAcgBvAHYAaQBzAGkAbwBuAGkAbgBnAFQAeQBwAGUAIABUAGgAaQBuACAAfAAgAGcAZQB0AC0AZABpAHMAawAgAHwAIABJAG4AaQB0AGkAYQBsAGkAegBlAC0ARABpAHMAawAgAC0AUABhAHIAdABpAHQAaQBvAG4AUwB0AHkAbABlACAARwBQAFQAIAAtAFAAYQBzAHMAVABoAHIAdQAgAHwAIABOAGUAdwAtAFAAYQByAHQAaQB0AGkAbwBuACAALQBEAHIAaQB2AGUATABlAHQAdABlAHIAIAAkAGQAaQBzAGsALgBMAGUAdAB0AGUAcgAgAC0AVQBzAGUATQBhAHgAaQBtAHUAbQBTAGkAegBlACAAfAAgAEYAbwByAG0AYQB0AC0AVgBvAGwAdQBtAGUAIAAtAEYAaQBsAGUAUwB5AHMAdABlAG0AIABOAFQARgBTACAALQBOAGUAdwBGAGkAbABlAFMAeQBzAHQAZQBtAEwAYQBiAGUAbAAgACQAZABpAHMAawAuAE4AYQBtAGUAIAAtAEMAbwBuAGYAaQByAG0AOgAkAGYAYQBsAHMAZQB9AA0ACgANAAoA"
+      },
+      "Linux": {
+        "fileUris": "[concat(parameters('_artifactsLocation'),'/scripts/disks.sh',parameters('_artifactsLocationSasToken'))]",
+        "commandToExecute": "[variables('VM_SIZES')[parameters('DataBaseSize')].sapscriptArguments]",
+        "DBcommandToExecute": "[concat('while [ ! -f /var/lib/waagent/CustomData ]; do sleep 1; done;sleep 10;cat /var/lib/waagent/CustomData | base64 --decode | sh -s -- ', variables('VM_SIZES')[parameters('DataBaseSize')].scriptArguments)]",
+        "customData": "IyEvYmluL2Jhc2gKCmZ1bmN0aW9uIGxvZygpCnsKICBtZXNzYWdlPSRACiAgZWNobyAiJG1lc3NhZ2UiCiAgZWNobyAiJG1lc3NhZ2UiID4+IC92YXIvbG9nL3NhcGNvbmZpZ2NyZWF0ZQp9CgpmdW5jdGlvbiBhZGR0b2ZzdGFiKCkKewogIGxvZyAiYWRkdG9mc3RhYiIKICBwYXJ0UGF0aD0kMQogIG1vdW50PSQyCgogIGxvY2FsIGJsa2lkPSQoL3NiaW4vYmxraWQgJHBhcnRQYXRoKQoKICBpZiBbWyAkYmxraWQgPX4gIFVVSUQ9XCIoLnszNn0pXCIgXV0KICB0aGVuCgogICAgbG9nICJBZGRpbmcgZnN0YWIgZW50cnkiCiAgICBsb2NhbCB1dWlkPSR7QkFTSF9SRU1BVENIWzFdfTsKICAgIGxvY2FsIG1vdW50Q21kPSIiCiAgICBsb2cgImFkZGluZyBmc3RhYiBlbnRyeSIKICAgIG1vdW50Q21kPSIvZGV2L2Rpc2svYnktdXVpZC8kdXVpZCAkbW91bnQgeGZzICBkZWZhdWx0cyxub2ZhaWwgIDAgIDIiCiAgICBlY2hvICIkbW91bnRDbWQiID4+IC9ldGMvZnN0YWIKICAgICQobW91bnQgJHBhcnRQYXRoICRtb3VudCkKCiAgZWxzZQogICAgbG9nICJubyBVVUlEIGZvdW5kIgogICAgZXhpdCAtMTsKICBmaQoKICBsb2cgImFkZHRvZnN0YWIgZG9uZSIKfQoKZnVuY3Rpb24gZ2V0ZGV2aWNlcGF0aCgpCnsKCiAgbG9nICJnZXRkZXZpY2VwYXRoIgogIGdldGRldmljZXBhdGhyZXN1bHQ9IiIKICBsb2NhbCBsdW49JDEKICBsb2NhbCByZWFkbGlua091dHB1dD0kKHJlYWRsaW5rIC9kZXYvZGlzay9henVyZS9zY3NpMS9sdW4kbHVuKQogIGxvY2FsIHNjc2lPdXRwdXQ9JChsc3Njc2kpCiAgaWYgW1sgJHJlYWRsaW5rT3V0cHV0ID1+IChzZFthLXpBLVpdezEsMn0pIF1dOwogIHRoZW4KICAgIGxvZyAiZm91bmQgZGV2aWNlIHBhdGggdXNpbmcgcmVhZGxpbmsiCiAgICBnZXRkZXZpY2VwYXRocmVzdWx0PSIvZGV2LyR7QkFTSF9SRU1BVENIWzFdfSI7CiAgZWxpZiBbWyAkc2NzaU91dHB1dCA9fiBcWzU6MDowOiRsdW5cXVteXFtdKigvZGV2L3NkW2EtekEtWl17MSwyfSkgXV07CiAgdGhlbgogICAgbG9nICJmb3VuZCBkZXZpY2UgcGF0aCB1c2luZyBsc3Njc2kiCiAgICBnZXRkZXZpY2VwYXRocmVzdWx0PSR7QkFTSF9SRU1BVENIWzFdfTsKICBlbHNlCiAgICBsb2cgImxzc2NzaSBvdXRwdXQgbm90IGFzIGV4cGVjdGVkIGZvciAkbHVuIgogICAgZXhpdCAtMTsKICBmaQogIGxvZyAiZ2V0ZGV2aWNlcGF0aCBkb25lIgoKfQoKZnVuY3Rpb24gY3JlYXRlbHZtKCkKewoKICBsb2cgImNyZWF0ZWx2bSIKCiAgbG9jYWwgbHVuc0E9KCR7MS8vLC8gfSkKICBsb2NhbCB2Z05hbWU9JDIKICBsb2NhbCBsdk5hbWU9JDMKICBsb2NhbCBtb3VudFBhdGhBPSgkezQvLywvIH0pCiAgbG9jYWwgc2l6ZUE9KCR7NS8vLC8gfSkKCiAgbG9jYWwgbHVuc0NvdW50PSR7I2x1bnNBW0BdfQogIGxvY2FsIG1vdW50UGF0aENvdW50PSR7I21vdW50UGF0aEFbQF19CiAgbG9jYWwgc2l6ZUNvdW50PSR7I3NpemVBW0BdfQogIGxvZyAiY291bnQgJGx1bnNDb3VudCAkbW91bnRQYXRoQ291bnQgJHNpemVDb3VudCIKICBpZiBbWyAkbHVuc0NvdW50IC1ndCAxIF1dCiAgdGhlbgogICAgbG9nICJjcmVhdGVsdm0gLSBjcmVhdGluZyBsdm0iCgogICAgbG9jYWwgbnVtUmFpZERldmljZXM9MAogICAgbG9jYWwgcmFpZERldmljZXM9IiIKICAgIGxvZyAibnVtIGx1bnMgJGx1bnNDb3VudCIKCiAgICBmb3IgKChpPTA7IGk8bHVuc0NvdW50OyBpKyspKQogICAgZG8KICAgICAgbG9nICJ0cnlpbmcgdG8gZmluZCBkZXZpY2UgcGF0aCIKICAgICAgbG9jYWwgbHVuPSR7bHVuc0FbJGldfQogICAgICBnZXRkZXZpY2VwYXRoICRsdW4KICAgICAgbG9jYWwgZGV2aWNlUGF0aD0kZ2V0ZGV2aWNlcGF0aHJlc3VsdDsKCiAgICAgIGlmIFsgLW4gIiRkZXZpY2VQYXRoIiBdOwogICAgICB0aGVuCiAgICAgICAgbG9nICIgRGV2aWNlIFBhdGggaXMgJGRldmljZVBhdGgiCiAgICAgICAgbnVtUmFpZERldmljZXM9JCgobnVtUmFpZERldmljZXMgKyAxKSkKICAgICAgICByYWlkRGV2aWNlcz0iJHJhaWREZXZpY2VzICRkZXZpY2VQYXRoICIKICAgICAgZWxzZQogICAgICAgIGxvZyAibm8gZGV2aWNlIHBhdGggZm9yIExVTiAkbHVuIgogICAgICAgIGV4aXQgLTE7CiAgICAgIGZpCiAgICBkb25lCgogICAgbG9nICJudW06ICRudW1SYWlkRGV2aWNlcyBwYXRoczogJyRyYWlkRGV2aWNlcyciCiAgICAkKHB2Y3JlYXRlICRyYWlkRGV2aWNlcykKICAgICQodmdjcmVhdGUgJHZnTmFtZSAkcmFpZERldmljZXMpCgogICAgZm9yICgoaj0wOyBqPG1vdW50UGF0aENvdW50OyBqKyspKQogICAgZG8KICAgICAgbG9jYWwgbW91bnRQYXRoTG9jPSR7bW91bnRQYXRoQVskal19CiAgICAgIGxvY2FsIHNpemVMb2M9JHtzaXplQVskal19CiAgICAgIGxvY2FsIGx2TmFtZUxvYz0iJGx2TmFtZS0kaiIKICAgICAgJChsdmNyZWF0ZSAtLWV4dGVudHMgJHNpemVMb2MlRlJFRSAtLXN0cmlwZXMgJG51bVJhaWREZXZpY2VzIC0tbmFtZSAkbHZOYW1lTG9jICR2Z05hbWUpCiAgICAgICQobWtmcyAtdCB4ZnMgL2Rldi8kdmdOYW1lLyRsdk5hbWVMb2MpCiAgICAgICQobWtkaXIgLXAgJG1vdW50UGF0aExvYykKCiAgICAgIGFkZHRvZnN0YWIgL2Rldi8kdmdOYW1lLyRsdk5hbWVMb2MgJG1vdW50UGF0aExvYwogICAgZG9uZQoKICBlbHNlCiAgICBsb2cgImNyZWF0ZWx2bSAtIGNyZWF0aW5nIHNpbmdsZSBkaXNrIgoKICAgIGxvY2FsIGx1bj0ke2x1bnNBWzBdfQogICAgbG9jYWwgbW91bnRQYXRoTG9jPSR7bW91bnRQYXRoQVswXX0KICAgIGdldGRldmljZXBhdGggJGx1bjsKICAgIGxvY2FsIGRldmljZVBhdGg9JGdldGRldmljZXBhdGhyZXN1bHQ7CiAgICBpZiBbIC1uICIkZGV2aWNlUGF0aCIgXTsKICAgIHRoZW4KICAgICAgbG9nICIgRGV2aWNlIFBhdGggaXMgJGRldmljZVBhdGgiCiAgICAgICMgaHR0cDovL3N1cGVydXNlci5jb20vcXVlc3Rpb25zLzMzMjI1Mi9jcmVhdGluZy1hbmQtZm9ybWF0aW5nLWEtcGFydGl0aW9uLXVzaW5nLWEtYmFzaC1zY3JpcHQKICAgICAgJChlY2hvIC1lICJuXG5wXG4xXG5cblxudyIgfCBmZGlzayAkZGV2aWNlUGF0aCkgPiAvZGV2L251bGwKICAgICAgbG9jYWwgcGFydFBhdGg9IiRkZXZpY2VQYXRoIiIxIgogICAgICAkKG1rZnMgLXQgeGZzICRwYXJ0UGF0aCkgPiAvZGV2L251bGwKICAgICAgJChta2RpciAtcCAkbW91bnRQYXRoTG9jKQoKICAgICAgYWRkdG9mc3RhYiAkcGFydFBhdGggJG1vdW50UGF0aExvYwogICAgZWxzZQogICAgICBsb2cgIm5vIGRldmljZSBwYXRoIGZvciBMVU4gJGx1biIKICAgICAgZXhpdCAtMTsKICAgIGZpCiAgZmkKCiAgbG9nICJjcmVhdGVsdm0gZG9uZSIKfQoKbG9nICRACgpsdW5zPSIiCm5hbWVzPSIiCnBhdGhzPSIiCnNpemVzPSIiCgp3aGlsZSB0cnVlOwpkbwogIGNhc2UgIiQxIiBpbgogICAgIi1sdW5zIikgIGx1bnM9JDI7c2hpZnQgMjtsb2cgImZvdW5kIGx1bnMiCiAgICA7OwogICAgIi1uYW1lcyIpICBuYW1lcz0kMjtzaGlmdCAyO2xvZyAiZm91bmQgbmFtZXMiCiAgICA7OwogICAgIi1wYXRocyIpICBwYXRocz0kMjtzaGlmdCAyO2xvZyAiZm91bmQgcGF0aHMiCiAgICA7OwogICAgIi1zaXplcyIpICBzaXplcz0kMjtzaGlmdCAyO2xvZyAiZm91bmQgc2l6ZXMiCiAgICA7OwogICAgKikgbG9nICJ1bmtub3duIHBhcmFtZXRlciAkMSI7c2hpZnQgMTsKICAgIDs7CiAgZXNhYwoKICBpZiBbWyAteiAiJDEiIF1dOwogIHRoZW4KICAgIGJyZWFrOwogIGZpCmRvbmUKCmx1bnNTcGxpdD0oJHtsdW5zLy8jLyB9KQpuYW1lc1NwbGl0PSgke25hbWVzLy8jLyB9KQpwYXRoc1NwbGl0PSgke3BhdGhzLy8jLyB9KQpzaXplc1NwbGl0PSgke3NpemVzLy8jLyB9KQoKbHVuc0NvdW50PSR7I2x1bnNTcGxpdFtAXX0KbmFtZXNDb3VudD0keyNuYW1lc1NwbGl0W0BdfQpwYXRoc0NvdW50PSR7I3BhdGhzU3BsaXRbQF19CnNpemVzQ291bnQ9JHsjc2l6ZXNTcGxpdFtAXX0KCmxvZyAiY291bnQgJGx1bnNDb3VudCAkbmFtZXNDb3VudCAkcGF0aHNDb3VudCAkc2l6ZXNDb3VudCIKCmlmIFtbICRsdW5zQ291bnQgLWVxICRuYW1lc0NvdW50ICYmICRuYW1lc0NvdW50IC1lcSAkcGF0aHNDb3VudCAmJiAkcGF0aHNDb3VudCAtZXEgJHNpemVzQ291bnQgXV0KdGhlbgogIGZvciAoKGlwYXJ0PTA7IGlwYXJ0PGx1bnNDb3VudDsgaXBhcnQrKykpCiAgZG8KICAgIGx1bj0ke2x1bnNTcGxpdFskaXBhcnRdfQogICAgbmFtZT0ke25hbWVzU3BsaXRbJGlwYXJ0XX0KICAgIHBhdGg9JHtwYXRoc1NwbGl0WyRpcGFydF19CiAgICBzaXplPSR7c2l6ZXNTcGxpdFskaXBhcnRdfQoKICAgIGxvZyAiY3JlYXRpbmcgZGlzayB3aXRoICRsdW4gJG5hbWUgJHBhdGggJHNpemUiCiAgICBjcmVhdGVsdm0gJGx1biAidmctJG5hbWUiICJsdi0kbmFtZSIgIiRwYXRoIiAiJHNpemUiOwogIGRvbmUKZWxzZQogIGxvZyAiY291bnQgbm90IGVxdWFsIgpmaQoKCg=="
+      },
+      "SAP": {
+        "fileUris": "[concat(parameters('_artifactsLocation'),'/scripts/hanadbinstall.sh',parameters('_artifactsLocationSasToken'))]",
+        "commandToExecute": "[concat('sudo bash hanadbinstall.sh \"', variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SapBitsURI, '\"  \"' , variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName, '\" \"', parameters('adminPassword'),'\" \"', tolower(parameters('SAPSystemId')), '\" \"', parameters('hanaNumber'), '\"')]",
+        "customData": "JABmAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgAD0AIAAiAFMAQQBQAFMAdABvAHIAYQBnAGUAUABvAG8AbAAiADsAIAANAAoAJABDAGEAbgBwAG8AbwBsAGQAaQBzAGsAcwAgAD0AIABHAGUAdAAtAFAAaAB5AHMAaQBjAGEAbABEAGkAcwBrACAAfAA/ACAAewAkAF8ALgBDAGEAbgBQAG8AbwBsACAALQBlAHEAIAAkAHQAcgB1AGUAfQA7AA0ACgBOAGUAdwAtAFMAdABvAHIAYQBnAGUAUABvAG8AbAAgAC0AUwB0AG8AcgBhAGcAZQBTAHUAYgBTAHkAcwB0AGUAbQBGAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgACIAKgBTAHQAbwByAGEAZwBlACoAIgAgAC0ARgByAGkAZQBuAGQAbAB5AE4AYQBtAGUAIAAkAGYAcgBpAGUAbgBkAGwAeQBOAGEAbQBlACAALQBQAGgAeQBzAGkAYwBhAGwARABpAHMAawBzACAAJABDAGEAbgBwAG8AbwBsAGQAaQBzAGsAcwA7AA0ACgAkAEQAaQBzAGsAcwAgAD0AIABAACgAQAB7AE4AYQBtAGUAPQAiAEwAbwBnAHMAIgA7AFMAaQB6AGUAPQA1ADEAMgBHAEIAOwBMAGUAdAB0AGUAcgA9ACIATAAiAH0AOwBAAHsATgBhAG0AZQA9ACIAUwBBAFAAIgA7AFMAaQB6AGUAPQA2ADQARwBCADsATABlAHQAdABlAHIAPQAiAFMAIgB9ADsAQAB7AE4AYQBtAGUAPQAiAEQAYQB0AGEAIgA7AFMAaQB6AGUAPQA1ADEAMgAwAEcAQgA7AEwAZQB0AHQAZQByAD0AIgBUACIAfQA7AEAAewBOAGEAbQBlAD0AIgBTAGgAYQByAGUAZAAiADsAUwBpAHoAZQA9ADEAMAAyADQARwBCADsATABlAHQAdABlAHIAPQAiAFgAIgB9ADsAQAB7AE4AYQBtAGUAPQAiAEIAYQBjAGsAdQBwACIAOwBTAGkAegBlAD0ANQAxADIAMABHAEIAOwBMAGUAdAB0AGUAcgA9ACIAWgAiAH0AOwApADsAIAANAAoAZgBvAHIAZQBhAGMAaAAgACgAJABkAGkAcwBrACAAaQBuACAAJABkAGkAcwBrAHMAKQAgAHsAJAB2AGQAIAA9ACAATgBlAHcALQBWAGkAcgB0AHUAYQBsAEQAaQBzAGsAIAAtAFMAdABvAHIAYQBnAGUAUABvAG8AbABGAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgACQAZgByAGkAZQBuAGQAbAB5AE4AYQBtAGUAIAAtAEYAcgBpAGUAbgBkAGwAeQBOAGEAbQBlACAAJABkAGkAcwBrAC4ATgBhAG0AZQAgAC0AUwBpAHoAZQAgACQAZABpAHMAawAuAFMAaQB6AGUAIAAtAFIAZQBzAGkAbABpAGUAbgBjAHkAUwBlAHQAdABpAG4AZwBOAGEAbQBlACAAUwBpAG0AcABsAGUAIAAtAFAAcgBvAHYAaQBzAGkAbwBuAGkAbgBnAFQAeQBwAGUAIABUAGgAaQBuACAAfAAgAGcAZQB0AC0AZABpAHMAawAgAHwAIABJAG4AaQB0AGkAYQBsAGkAegBlAC0ARABpAHMAawAgAC0AUABhAHIAdABpAHQAaQBvAG4AUwB0AHkAbABlACAARwBQAFQAIAAtAFAAYQBzAHMAVABoAHIAdQAgAHwAIABOAGUAdwAtAFAAYQByAHQAaQB0AGkAbwBuACAALQBEAHIAaQB2AGUATABlAHQAdABlAHIAIAAkAGQAaQBzAGsALgBMAGUAdAB0AGUAcgAgAC0AVQBzAGUATQBhAHgAaQBtAHUAbQBTAGkAegBlACAAfAAgAEYAbwByAG0AYQB0AC0AVgBvAGwAdQBtAGUAIAAtAEYAaQBsAGUAUwB5AHMAdABlAG0AIABOAFQARgBTACAALQBOAGUAdwBGAGkAbABlAFMAeQBzAHQAZQBtAEwAYQBiAGUAbAAgACQAZABpAHMAawAuAE4AYQBtAGUAIAAtAEMAbwBuAGYAaQByAG0AOgAkAGYAYQBsAHMAZQB9AA0ACgANAAoA"
+      },
+      "HanaJump": {
+        "fileUris": "[concat(parameters('_artifactsLocation'),'/hanastudio.ps1',parameters('_artifactsLocationSasToken'))]",
+        "commandToExecute": "[concat('powershell.exe -executionpolicy unrestricted -file hanastudio.ps1 -baseUri ',variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SapBitsURI)]",
+        "customData": "JABmAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgAD0AIAAiAFMAQQBQAFMAdABvAHIAYQBnAGUAUABvAG8AbAAiADsAIAANAAoAJABDAGEAbgBwAG8AbwBsAGQAaQBzAGsAcwAgAD0AIABHAGUAdAAtAFAAaAB5AHMAaQBjAGEAbABEAGkAcwBrACAAfAA/ACAAewAkAF8ALgBDAGEAbgBQAG8AbwBsACAALQBlAHEAIAAkAHQAcgB1AGUAfQA7AA0ACgBOAGUAdwAtAFMAdABvAHIAYQBnAGUAUABvAG8AbAAgAC0AUwB0AG8AcgBhAGcAZQBTAHUAYgBTAHkAcwB0AGUAbQBGAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgACIAKgBTAHQAbwByAGEAZwBlACoAIgAgAC0ARgByAGkAZQBuAGQAbAB5AE4AYQBtAGUAIAAkAGYAcgBpAGUAbgBkAGwAeQBOAGEAbQBlACAALQBQAGgAeQBzAGkAYwBhAGwARABpAHMAawBzACAAJABDAGEAbgBwAG8AbwBsAGQAaQBzAGsAcwA7AA0ACgAkAEQAaQBzAGsAcwAgAD0AIABAACgAQAB7AE4AYQBtAGUAPQAiAEwAbwBnAHMAIgA7AFMAaQB6AGUAPQA1ADEAMgBHAEIAOwBMAGUAdAB0AGUAcgA9ACIATAAiAH0AOwBAAHsATgBhAG0AZQA9ACIAUwBBAFAAIgA7AFMAaQB6AGUAPQA2ADQARwBCADsATABlAHQAdABlAHIAPQAiAFMAIgB9ADsAQAB7AE4AYQBtAGUAPQAiAEQAYQB0AGEAIgA7AFMAaQB6AGUAPQA1ADEAMgAwAEcAQgA7AEwAZQB0AHQAZQByAD0AIgBUACIAfQA7AEAAewBOAGEAbQBlAD0AIgBTAGgAYQByAGUAZAAiADsAUwBpAHoAZQA9ADEAMAAyADQARwBCADsATABlAHQAdABlAHIAPQAiAFgAIgB9ADsAQAB7AE4AYQBtAGUAPQAiAEIAYQBjAGsAdQBwACIAOwBTAGkAegBlAD0ANQAxADIAMABHAEIAOwBMAGUAdAB0AGUAcgA9ACIAWgAiAH0AOwApADsAIAANAAoAZgBvAHIAZQBhAGMAaAAgACgAJABkAGkAcwBrACAAaQBuACAAJABkAGkAcwBrAHMAKQAgAHsAJAB2AGQAIAA9ACAATgBlAHcALQBWAGkAcgB0AHUAYQBsAEQAaQBzAGsAIAAtAFMAdABvAHIAYQBnAGUAUABvAG8AbABGAHIAaQBlAG4AZABsAHkATgBhAG0AZQAgACQAZgByAGkAZQBuAGQAbAB5AE4AYQBtAGUAIAAtAEYAcgBpAGUAbgBkAGwAeQBOAGEAbQBlACAAJABkAGkAcwBrAC4ATgBhAG0AZQAgAC0AUwBpAHoAZQAgACQAZABpAHMAawAuAFMAaQB6AGUAIAAtAFIAZQBzAGkAbABpAGUAbgBjAHkAUwBlAHQAdABpAG4AZwBOAGEAbQBlACAAUwBpAG0AcABsAGUAIAAtAFAAcgBvAHYAaQBzAGkAbwBuAGkAbgBnAFQAeQBwAGUAIABUAGgAaQBuACAAfAAgAGcAZQB0AC0AZABpAHMAawAgAHwAIABJAG4AaQB0AGkAYQBsAGkAegBlAC0ARABpAHMAawAgAC0AUABhAHIAdABpAHQAaQBvAG4AUwB0AHkAbABlACAARwBQAFQAIAAtAFAAYQBzAHMAVABoAHIAdQAgAHwAIABOAGUAdwAtAFAAYQByAHQAaQB0AGkAbwBuACAALQBEAHIAaQB2AGUATABlAHQAdABlAHIAIAAkAGQAaQBzAGsALgBMAGUAdAB0AGUAcgAgAC0AVQBzAGUATQBhAHgAaQBtAHUAbQBTAGkAegBlACAAfAAgAEYAbwByAG0AYQB0AC0AVgBvAGwAdQBtAGUAIAAtAEYAaQBsAGUAUwB5AHMAdABlAG0AIABOAFQARgBTACAALQBOAGUAdwBGAGkAbABlAFMAeQBzAHQAZQBtAEwAYQBiAGUAbAAgACQAZABpAHMAawAuAE4AYQBtAGUAIAAtAEMAbwBuAGYAaQByAG0AOgAkAGYAYQBsAHMAZQB9AA0ACgANAAoA"
+      }
+    },
+    "DR_Info": {
+      "DR_RGName": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ASR_RGName]",
+      "DR_Location": "[variables('DR_RegionPairs')[resourceGroup().location]]",
+      "DR_vNETName": "[concat(split(variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_ID,'/')[8],'-asr01')]",
+      "DR_VaultName": "[concat(tolower(parameters('SAPSystemId')),'-DRVault')]",
+      "DR_PolicyName": "24Hour-ReplicationPolicy"
+    },
+    "DR_RegionPairs": {
+      "CentralUS": "EastUS2",
+      "EastUS": "WestUS",
+      "EastUS2": "CentralUS",
+      "NorthCentralUS": "SouthCentralUS",
+      "SouthCentralUS": "NorthCentralUS",
+      "WestCentralUS": "WestUS2",
+      "WestUS": "EastUS",
+      "WestUS2": "WestCentralUS"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('Database--',deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['Database'].Link]"
+        },
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "adminUsername": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName]"
+          },
+          "Authentication": {
+            "value": "[parameters('Authentication')]"
+          },
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "Server_Count": {
+            "value": "[variables('SAP_ENV')[parameters('Environment')].Database]"
+          },
+          "hanaNumber": {
+            "value": "[parameters('hanaNumber')]"
+          },
+          "Monitor_Storage_url": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+          },
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ILB_INFO": {
+            "value": "[variables('ILB_INFO')]"
+          },
+          "SSH": {
+            "value": "[variables('SSH')]"
+          },
+          "SUBSCRIPTION_ENV": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+          },
+          "TAGS": {
+            "value": "[variables('TAGS')]"
+          },
+          "VM_EXTENSIONS": {
+            "value": "[variables('VM_EXTENSIONS')]"
+          },
+          "VM_IMAGES": {
+            "value": "[variables('VM_IMAGES')[parameters('OperatingSystem')]]"
+          },
+          "VM_SIZES": {
+            "value": "[variables('VM_SIZES')[parameters('DataBaseSize')].DBsize]"
+          },
+          "TEMPLATES": {
+            "value": "[variables('TEMPLATES')]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[bool(if(equals(parameters('DataBaseSize'),'HLI'),'false', json('true')))]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('WebDispatcher--', deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['WebDispatcher'].Link]"
+        },
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "adminUsername": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName]"
+          },
+          "Authentication": {
+            "value": "[parameters('Authentication')]"
+          },
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "Server_Count": {
+            "value": "[variables('SAP_ENV')[parameters('Environment')].WebDispatcher]"
+          },
+          "hanaNumber": {
+            "value": "[parameters('hanaNumber')]"
+          },
+          "Monitor_Storage_url": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+          },
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ILB_INFO": {
+            "value": "[variables('ILB_INFO')]"
+          },
+          "SSH": {
+            "value": "[variables('SSH')]"
+          },
+          "SUBSCRIPTION_ENV": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+          },
+          "TAGS": {
+            "value": "[variables('TAGS')]"
+          },
+          "VM_EXTENSIONS": {
+            "value": "[variables('VM_EXTENSIONS')]"
+          },
+          "VM_IMAGES": {
+            "value": "[variables('VM_IMAGES')[parameters('OperatingSystem')]]"
+          },
+          "VM_SIZES": {
+            "value": "[variables('VM_SIZES')[parameters('DataBaseSize')].WebSize]"
+          },
+          "TEMPLATES": {
+            "value": "[variables('TEMPLATES')]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[greater(parameters('WebDispatcherCount'),0)]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('ASCS--', deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['ASCS'].Link]"
+        },
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "adminUsername": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName]"
+          },
+          "Authentication": {
+            "value": "[parameters('Authentication')]"
+          },
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "Server_Count": {
+            "value": "[variables('SAP_ENV')[parameters('Environment')].ASCS]"
+          },
+          "hanaNumber": {
+            "value": "[parameters('hanaNumber')]"
+          },
+          "Monitor_Storage_url": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+          },
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ILB_INFO": {
+            "value": "[variables('ILB_INFO')]"
+          },
+          "SSH": {
+            "value": "[variables('SSH')]"
+          },
+          "SUBSCRIPTION_ENV": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+          },
+          "TAGS": {
+            "value": "[variables('TAGS')]"
+          },
+          "VM_EXTENSIONS": {
+            "value": "[variables('VM_EXTENSIONS')]"
+          },
+          "VM_IMAGES": {
+            "value": "[variables('VM_IMAGES')[parameters('OperatingSystem')]]"
+          },
+          "VM_SIZES": {
+            "value": "[variables('VM_SIZES')[parameters('DataBaseSize')].ASCSSize]"
+          },
+          "TEMPLATES": {
+            "value": "[variables('TEMPLATES')]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[bool(if(equals(parameters('Environment'),'Sandbox'),'false', json('true')))]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('AppServer--', deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['AppServer'].Link]"
+        },
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "adminUsername": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName]"
+          },
+          "Authentication": {
+            "value": "[parameters('Authentication')]"
+          },
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "Server_Count": {
+            "value": "[variables('SAP_ENV')[parameters('Environment')].AppServer]"
+          },
+          "hanaNumber": {
+            "value": "[parameters('hanaNumber')]"
+          },
+          "Monitor_Storage_url": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+          },
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ILB_INFO": {
+            "value": "[variables('ILB_INFO')]"
+          },
+          "SSH": {
+            "value": "[variables('SSH')]"
+          },
+          "SUBSCRIPTION_ENV": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+          },
+          "TAGS": {
+            "value": "[variables('TAGS')]"
+          },
+          "VM_EXTENSIONS": {
+            "value": "[variables('VM_EXTENSIONS')]"
+          },
+          "VM_IMAGES": {
+            "value": "[variables('VM_IMAGES')[parameters('OperatingSystem')]]"
+          },
+          "VM_SIZES": {
+            "value": "[variables('VM_SIZES')[parameters('DataBaseSize')].AppSize]"
+          },
+          "TEMPLATES": {
+            "value": "[variables('TEMPLATES')]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[greater(parameters('AppServerCount'),0)]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('Fiori--', deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['Fiori'].Link]"
+        },
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "adminUsername": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName]"
+          },
+          "Authentication": {
+            "value": "[parameters('Authentication')]"
+          },
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "Server_Count": {
+            "value": "[variables('SAP_ENV')[parameters('Environment')].Fiori]"
+          },
+          "hanaNumber": {
+            "value": "[parameters('hanaNumber')]"
+          },
+          "Monitor_Storage_url": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+          },
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ILB_INFO": {
+            "value": "[variables('ILB_INFO')]"
+          },
+          "SSH": {
+            "value": "[variables('SSH')]"
+          },
+          "SUBSCRIPTION_ENV": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+          },
+          "TAGS": {
+            "value": "[variables('TAGS')]"
+          },
+          "VM_EXTENSIONS": {
+            "value": "[variables('VM_EXTENSIONS')]"
+          },
+          "VM_IMAGES": {
+            "value": "[variables('VM_IMAGES')[parameters('OperatingSystem')]]"
+          },
+          "VM_SIZES": {
+            "value": "[variables('VM_SIZES')[parameters('DataBaseSize')].FioriSize]"
+          },
+          "TEMPLATES": {
+            "value": "[variables('TEMPLATES')]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[greater(parameters('FIORICount'),0)]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('SolMan--', deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['SolMan'].Link]"
+        },
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "adminUsername": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName]"
+          },
+          "Authentication": {
+            "value": "[parameters('Authentication')]"
+          },
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "Server_Count": {
+            "value": "[variables('SAP_ENV')[parameters('Environment')].SolMan]"
+          },
+          "hanaNumber": {
+            "value": "[parameters('hanaNumber')]"
+          },
+          "Monitor_Storage_url": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+          },
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ILB_INFO": {
+            "value": "[variables('ILB_INFO')]"
+          },
+          "SSH": {
+            "value": "[variables('SSH')]"
+          },
+          "SUBSCRIPTION_ENV": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+          },
+          "TAGS": {
+            "value": "[variables('TAGS')]"
+          },
+          "VM_EXTENSIONS": {
+            "value": "[variables('VM_EXTENSIONS')]"
+          },
+          "VM_IMAGES": {
+            "value": "[variables('VM_IMAGES')[parameters('OperatingSystem')]]"
+          },
+          "VM_SIZES": {
+            "value": "[variables('VM_SIZES')[parameters('DataBaseSize')].SolManSize]"
+          },
+          "TEMPLATES": {
+            "value": "[variables('TEMPLATES')]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[greater(parameters('SolManCount'),0)]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('FileServer--', deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['FileServer'].Link]"
+        },
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "adminUsername": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName]"
+          },
+          "Authentication": {
+            "value": "[parameters('Authentication')]"
+          },
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "Server_Count": {
+            "value": "[variables('SAP_ENV')[parameters('Environment')].FileServer]"
+          },
+          "hanaNumber": {
+            "value": "[parameters('hanaNumber')]"
+          },
+          "Monitor_Storage_url": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+          },
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ILB_INFO": {
+            "value": "[variables('ILB_INFO')]"
+          },
+          "SSH": {
+            "value": "[variables('SSH')]"
+          },
+          "SUBSCRIPTION_ENV": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+          },
+          "TAGS": {
+            "value": "[variables('TAGS')]"
+          },
+          "VM_EXTENSIONS": {
+            "value": "[variables('VM_EXTENSIONS')]"
+          },
+          "VM_IMAGES": {
+            "value": "[variables('VM_IMAGES')[parameters('OperatingSystem')]]"
+          },
+          "VM_SIZES": {
+            "value": "[variables('VM_SIZES')[parameters('DataBaseSize')].NSFSize]"
+          },
+          "TEMPLATES": {
+            "value": "[variables('TEMPLATES')]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[greater(parameters('FileServerCount'),0)]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('JumpServer--', deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['JumpServer'].Link]"
+        },
+        "parameters": {
+          "adminPassword": {
+            "value": "[parameters('adminPassword')]"
+          },
+          "adminUsername": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].adminUserName]"
+          },
+          "Authentication": {
+            "value": "[parameters('Authentication')]"
+          },
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "Server_Count": {
+            "value": "[variables('SAP_ENV')[parameters('Environment')].Jump]"
+          },
+          "hanaNumber": {
+            "value": "[parameters('hanaNumber')]"
+          },
+          "Monitor_Storage_url": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+          },
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ILB_INFO": {
+            "value": "[variables('ILB_INFO')]"
+          },
+          "SSH": {
+            "value": "[variables('SSH')]"
+          },
+          "SUBSCRIPTION_ENV": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+          },
+          "TAGS": {
+            "value": "[variables('TAGS')]"
+          },
+          "VM_EXTENSIONS": {
+            "value": "[variables('VM_EXTENSIONS')]"
+          },
+          "VM_IMAGES": {
+            "value": "[variables('VM_IMAGES')['Windows']]"
+          },
+          "VM_SIZES": {
+            "value": "[variables('VM_SIZES')[parameters('DataBaseSize')].JumpSize]"
+          },
+          "TEMPLATES": {
+            "value": "[variables('TEMPLATES')]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[parameters('Build_Jump_Server?')]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "name": "[concat('AzureSiteRecovery--', deployment().name)]",
+      "apiVersion": "2017-05-10",
+      "subscriptionId": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ID]",
+      "resourceGroup": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].ASR_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[variables('TEMPLATES')['ASR'].Link]"
+        },
+        "parameters": {
+          "SAPSystemId": {
+            "value": "[tolower(parameters('SAPSystemId'))]"
+          },
+          "ASR-VaultName": {
+            "value": "[variables('DR_Info')['DR_VaultName']]"
+          },
+          "ASR-ReplicationPolicyName": {
+            "value": "[variables('DR_Info')['DR_PolicyName']]"
+          },
+          "Source-Location": {
+            "value": "[resourceGroup().location]"
+          },
+          "Source-RG-Name": {
+            "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].SAP_RGName]"
+          },
+          "Source-vNET-Name": {
+            "value": "[split(variables('SUBSCRIPTION_ENV')[parameters('Subscription')].vNET_ID,'/')[4]]"
+          },
+          "DR-Location": {
+            "value": "[variables('DR_Info')['DR_Location']]"
+          },
+          "DR-RG-Name": {
+            "value": "[variables('DR_Info')['DR_RGName']]"
+          },
+          "DR-vNET-Name": {
+            "value": "[variables('DR_Info')['DR_vNETName']]"
+          }
+        }
+      },
+      "dependsOn": [
+
+      ],
+      "condition": "[bool(if(equals(variables('SAP_ENV')[parameters('Environment')].DR,'no'),'false', json('true')))]"
+    }
+  ],
+  "outputs": {
+    "sidlower": {
+      "type": "string",
+      "value": "[tolower(parameters('SAPSystemId'))]"
+    },
+    "adminUserName": {
+      "type": "string",
+      "value": "[concat(tolower(parameters('SAPSystemId')),'admin')]"
+    },
+    "Monitor_Storage_url": {
+      "type": "string",
+      "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')].Monitor_Storage_url]"
+    },
+    "SAP_ENV": {
+      "type": "object",
+      "value": "[variables('SAP_ENV')[parameters('Environment')]]"
+    },
+    "SUBSCRIPTION_ENV": {
+      "type": "object",
+      "value": "[variables('SUBSCRIPTION_ENV')[parameters('Subscription')]]"
+    },
+    "TAGS": {
+      "type": "object",
+      "value": "[variables('TAGS')]"
+    },
+    "VM_EXTENSIONS": {
+      "type": "object",
+      "value": "[variables('VM_EXTENSIONS')]"
+    },
+    "VM_IMAGES": {
+      "type": "object",
+      "value": "[variables('VM_IMAGES')[parameters('OperatingSystem')]]"
+    },
+    "VM_SIZES": {
+      "type": "object",
+      "value": "[variables('VM_SIZES')[parameters('DataBaseSize')]]"
+    }
+  }
+} 

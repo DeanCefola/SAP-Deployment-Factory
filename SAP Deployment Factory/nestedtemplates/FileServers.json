@@ -1,0 +1,613 @@
+﻿{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminPassword": {
+      "type": "string"
+    },
+    "adminUsername": {
+      "type": "string"
+    },
+    "Authentication": {
+      "type": "string"
+    },
+    "Compliance": {
+      "type": "string"
+    },
+    "Server_Count": {
+      "type": "int"
+    },
+    "hanaNumber": {
+      "type": "string"
+    },
+    "Monitor_Storage_url": {
+      "type": "string"
+    },
+    "SAPSystemId": {
+      "type": "string"
+    },
+    "ILB_INFO": {
+      "type": "object"
+    },
+    "SSH": {
+      "type": "object"
+    },
+    "SUBSCRIPTION_ENV": {
+      "type": "object"
+    },
+    "TAGS": {
+      "type": "object"
+    },
+    "VM_EXTENSIONS": {
+      "type": "object"
+    },
+    "VM_IMAGES": {
+      "type": "object"
+    },
+    "VM_SIZES": {
+      "type": "string"
+    },
+    "Templates": {
+      "type": "object"
+    }
+  },
+  "variables": {
+    "AVSetInfo": [
+      {
+        "AVSetName": "[concat(parameters('SAPSystemId'),'-AVSet-File')]"
+      }
+    ],
+    "Extension_Windows": {
+      "publisher": "Microsoft.Compute",
+      "type": "CustomScriptExtension",
+      "typeHandlerVersion": "1.9",
+      "autoUpgradeMinorVersion": true,
+      "settings": {
+        "commandToExecute": "[parameters('VM_EXTENSIONS')['Windows'].commandToExecute]",
+        "fileUris": [
+          "[parameters('VM_EXTENSIONS')['Windows'].fileUris]"
+        ]
+      }
+    },
+    "Extension_Linux": {
+      "publisher": "Microsoft.Azure.Extensions",
+      "type": "CustomScript",
+      "typeHandlerVersion": "2.0",
+      "autoUpgradeMinorVersion": true,
+      "protectedSettings": {
+        "fileUris": [
+          "[parameters('VM_EXTENSIONS')['Linux'].fileUris]"
+        ],
+        "commandToExecute": "[parameters('VM_EXTENSIONS')['Linux'].commandToExecute]"
+      }
+    },
+    "Configuration_Linux": {
+      "disablePasswordAuthentication": "[if(equals(parameters('Authentication'),'sshKey'),'true','false')]",
+      "ssh": "[if(equals(parameters('Authentication'),'sshKey'),variables('SSHProfile'),json('null'))]"
+    },
+    "Configuration_Windows": {
+      "enableAutomaticUpdates": true,
+      "provisionVMAgent": true,
+      "timeZone": "[parameters('SUBSCRIPTION_ENV').timeZone]"
+    },
+    "NicConfig_ILB": {
+      "ipConfigurations": [
+        {
+          "name": "ipconfig0",
+          "properties": {
+            "privateIPAllocationMethod": "Dynamic",
+            "subnet": {
+              "id": "[parameters('SUBSCRIPTION_ENV').vNET_Subnets_FileServers]"
+            },
+            "applicationSecurityGroups": [
+              {
+                "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-File-ASG'))]"
+              }
+            ],
+            "loadBalancerBackendAddressPools": [
+              {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',concat(parameters('SAPSystemId'), '_LB_File')),'/backendAddressPools/',concat(parameters('SAPSystemId'), '_LB_File-BackEnd'))]"
+              }
+            ]
+          }
+        }
+      ],
+      "enableAcceleratedNetworking": true,
+      "networkSecurityGroup": {
+        "id": "[resourceId('Microsoft.Network/networkSecurityGroups',concat(parameters('SAPSystemId'),'-File-NSG'))]"
+      }
+    },
+    "NicConfig_noILB": {
+      "ipConfigurations": [
+        {
+          "name": "ipconfig0",
+          "properties": {
+            "privateIPAllocationMethod": "Dynamic",
+            "subnet": {
+              "id": "[parameters('SUBSCRIPTION_ENV').vNET_Subnets_FileServers]"
+            },
+            "applicationSecurityGroups": [
+              {
+                "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-File-ASG'))]"
+              }
+            ]
+          }
+        }
+      ],
+      "enableAcceleratedNetworking": true,
+      "networkSecurityGroup": {
+        "id": "[resourceId('Microsoft.Network/networkSecurityGroups',concat(parameters('SAPSystemId'),'-File-NSG'))]"
+      }
+    },
+    "SSHProfile": {
+      "publicKeys": [
+        {
+          "path": "[parameters('SSH').sshKeyPath]",
+          "keyData": "[parameters('SSH').sshKeyData]"
+        }
+      ]
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Compute/availabilitySets",
+      "name": "[variables('AVSetInfo')[copyIndex()].AVSetName]",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "File-AVSet-Copy",
+        "count": "[length(variables('AVSetInfo'))]"
+      },
+      "tags": {
+        "displayName": "File AvSet",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "sku": {
+        "name": "Aligned"
+      },
+      "properties": {
+        "platformUpdateDomainCount": 5,
+        "platformFaultDomainCount": 2
+      },
+      "dependsOn": [
+
+      ]
+    },
+    {
+      "type": "Microsoft.Network/loadBalancers",
+      "name": "[parameters('ILB_INFO')['File-ILB'].Name]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "File-ILB-Copy",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "File LoadBalancer",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      },
+      "properties": {
+        "frontendIPConfigurations": "[parameters('ILB_INFO')['File-ILB'].frontendIPConfigurations]",
+        "backendAddressPools": "[parameters('ILB_INFO')['File-ILB'].backendAddressPools]",
+        "loadBalancingRules": "[parameters('ILB_INFO')['File-ILB'].loadBalancingRules]",
+        "probes": "[parameters('ILB_INFO')['File-ILB'].probes]",
+        "inboundNatRules": "[parameters('ILB_INFO')['File-ILB'].inboundNatRules]",
+        "inboundNatPools": "[parameters('ILB_INFO')['File-ILB'].inboundNatPools]"
+      },
+      "condition": "[greater(parameters('Server_Count'),1)]"
+    },
+    {
+      "type": "Microsoft.Network/applicationSecurityGroups",
+      "name": "[concat(parameters('SAPSystemId'),'-File-ASG')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "File-Asg-Copy",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "File ASG",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "scale": null,
+      "dependsOn": [
+
+      ]
+    },
+    {
+      "name": "[concat(parameters('SAPSystemId'),'-File-NSG')]",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2018-01-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "File-Nsg-Copy",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "File NSG",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow-Azure_Storage-Outbound",
+            "properties": {
+              "description": "ALLOW-Azure_Storage-OUTBOUND",
+              "protocol": "TCP",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "[concat('Storage.',resourceGroup().location)]",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Outbound",
+              "sourcePortRanges": [
+                "8443",
+                "3260"
+              ],
+              "destinationPortRanges": [
+                "8443",
+                "3260"
+              ],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+
+      ]
+    },
+    {
+      "type": "Microsoft.Network/applicationSecurityGroups",
+      "name": "[concat(parameters('SAPSystemId'),'-Mgmt-ASG')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "Mgmt-Asg-Copy",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "Management ASG",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "scale": null,
+      "dependsOn": [
+
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "ewm-Mgmt-NSG",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "Mgt-Nsg-Copy",
+        "count": 1
+      },
+      "tags": {
+        "displayName": "Management NSG",
+        "sap_environment": "Prod",
+        "C3": "{\"organization\":ewm-RG-sap\"username\":Meghana\"email\":mgarise@costco.com\"application\":SAP\"glaccount\":622\"}"
+      },
+      "properties": {
+        "securityRules": [
+          {
+            "name": "SSH",
+            "properties": {
+              "protocol": "TCP",
+              "sourcePortRange": "*",
+              "destinationPortRange": "22",
+              "sourceAddressPrefix": "10.208.0.192/26",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": [],
+              "destinationApplicationSecurityGroups": [
+                {
+                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-Mgmt-ASG'))]"
+                }
+              ]
+            }
+          },
+          {
+            "name": "RDP",
+            "properties": {
+              "protocol": "TCP",
+              "sourcePortRange": "3389",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "10.208.0.192/26",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": [],
+              "destinationApplicationSecurityGroups": [
+                {
+                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-Mgmt-ASG'))]"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Deny-App-Mgmt-Inbound",
+            "properties": {
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "access": "Deny",
+              "priority": 4092,
+              "direction": "Inbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": [],
+              "sourceApplicationSecurityGroups": [
+                {
+                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-Mgmt-ASG'))]"
+                }
+              ],
+              "destinationApplicationSecurityGroups": [
+                {
+                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-File-ASG'))]"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Deny-Mgmt-App-Outbound",
+            "properties": {
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "access": "Deny",
+              "priority": 4092,
+              "direction": "Outbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": [],
+              "sourceApplicationSecurityGroups": [
+                {
+                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-File-ASG'))]"
+                }
+              ],
+              "destinationApplicationSecurityGroups": [
+                {
+                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-Mgmt-ASG'))]"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "Mgmt-Asg-Copy"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm-nic0')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "File-Nic-Copy0",
+        "count": "[parameters('Server_Count')]"
+      },
+      "tags": {
+        "displayName": "File Nic0",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "properties": "[if(equals(parameters('Server_Count'),1),variables('NicConfig_noILB'),variables('NicConfig_ILB'))]",
+      "dependsOn": [
+        "File-Nsg-Copy",
+        "[if(equals(parameters('Server_Count'),1),'File-AVSet-Copy','File-ILB-Copy')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm-nic1')]",
+      "apiVersion": "2018-02-01",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "File-Nic-Copy1",
+        "count": "[parameters('Server_Count')]"
+      },
+      "tags": {
+        "displayName": "File Nic1",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "Mgmt0",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[parameters('SUBSCRIPTION_ENV').vNET_Subnets_Mgmt]"
+              },
+              "applicationSecurityGroups": [
+                {
+                  "id": "[resourceId('Microsoft.Network/applicationSecurityGroups', concat(parameters('SAPSystemId'),'-Mgmt-ASG'))]"
+                }
+              ]
+            }
+          }
+        ],
+        "enableAcceleratedNetworking": true
+      },
+      "dependsOn": [
+        "Mgt-Nsg-Copy"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm')]",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "File-VM-Copy",
+        "count": "[parameters('Server_Count')]"
+      },
+      "tags": {
+        "displayName": "File VM",
+        "sap_environment": "[parameters('TAGS').SAP_Environment]",
+        "C3": "[concat('{\"organization\":',parameters('TAGS').Organization,'\"username\":',parameters('TAGS').UserName,'\"email\":',parameters('TAGS').Email,'\"application\":',parameters('TAGS').Application,'\"glaccount\":',parameters('TAGS').GLAccount,'\"}')]"
+      },
+      "properties": {
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets', concat(parameters('SAPSystemId'),'-AVSet-File'))]"
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[parameters('Monitor_Storage_url')]"
+          }
+        },
+        "hardwareProfile": {
+          "vmSize": "[parameters('VM_SIZES')]"
+        },
+        "osProfile": {
+          "computerName": "[concat(parameters('SAPSystemId'),'-File-vm-',copyIndex())]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "linuxConfiguration": "[if(equals(parameters('VM_IMAGES').OperatingSystem, 'Linux'), variables('Configuration_Linux'), json('null'))]",
+          "windowsConfiguration": "[if(equals(parameters('VM_IMAGES').OperatingSystem, 'Windows'), variables('Configuration_Windows'), json('null'))]",
+          "customData": "[if(equals(parameters('VM_IMAGES').OperatingSystem, 'Linux'), parameters('VM_EXTENSIONS')['Linux'].customData, parameters('VM_EXTENSIONS')['Windows'].customData)]"
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm-nic0'))]",
+              "properties": {
+                "primary": true
+              }
+            },
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm-nic1'))]",
+              "properties": {
+                "primary": false
+              }
+            }
+          ]
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[parameters('VM_IMAGES').Publisher]",
+            "offer": "[parameters('VM_IMAGES').Offer]",
+            "sku": "[parameters('VM_IMAGES').Sku]",
+            "version": "[parameters('VM_IMAGES').Version]"
+          },
+          "osDisk": {
+            "name": "[concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm-OSDisk')]",
+            "osType": "[parameters('VM_IMAGES').OperatingSystem]",
+            "createOption": "FromImage",
+            "caching": "ReadWrite",
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+            }
+          },
+          "dataDisks": [
+            {
+              "name": "[concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm-DataDisk0')]",
+              "diskSizeGB": 1023,
+              "lun": 0,
+              "createOption": "Empty",
+              "caching": "None",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
+            },
+            {
+              "name": "[concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm-DataDisk1')]",
+              "diskSizeGB": 1023,
+              "lun": 1,
+              "createOption": "Empty",
+              "caching": "None",
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              }
+            }
+          ]
+        },
+        "licenseType": "[if(equals(parameters('VM_IMAGES').OperatingSystem,'Windows'), 'Windows_Server',json('null'))]"
+      },
+      "dependsOn": [
+        "File-Asg-Copy",
+        "File-Nsg-Copy",
+        "File-Nic-Copy0",
+        "File-Nic-Copy1"
+      ],
+      "resources": [
+        {
+          "type": "Microsoft.Compute/virtualMachines/extensions",
+          "name": "[concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm','/', 'disk-config')]",
+          "location": "[resourceGroup().location]",
+          "apiVersion": "2015-06-15",
+          "tags": {
+            "displayName": "VmExtension"
+          },
+          "properties": "[if(equals(parameters('VM_IMAGES').OperatingSystem, 'Linux'), variables('Extension_Linux'), variables('Extension_Windows'))]",
+          "dependsOn": [
+            "[resourceId('Microsoft.Compute/virtualMachines',concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm'))]"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "2017-05-10",
+      "name": "[concat('File_Backup-', copyIndex())]",
+      "type": "Microsoft.Resources/deployments",
+      "copy": {
+        "name": "Backup-Copy",
+        "count": "[parameters('Server_Count')]"
+      },
+      "subscriptionId": "[parameters('SUBSCRIPTION_ENV').ID]",
+      "resourceGroup": "[parameters('SUBSCRIPTION_ENV').Backup_RGName]",
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "uri": "[parameters('Templates')['Backup'].Link]"
+        },
+        "parameters": {
+          "Compliance": {
+            "value": "[parameters('Compliance')]"
+          },
+          "VMName": {
+            "value": "[concat(parameters('SAPSystemId'),'-File',copyIndex(),'-vm')]"
+          },
+          "VM_RGName": {
+            "value": "[parameters('SUBSCRIPTION_ENV').SAP_RGName]"
+          },
+          "vaultName": {
+            "value": "[parameters('SUBSCRIPTION_ENV').Backup_VaultName]"
+          },
+          "Subscription_ID": {
+            "value": "[parameters('SUBSCRIPTION_ENV').ID]"
+          }
+        }
+      },
+      "dependsOn": [
+        "File-VM-Copy"
+      ]
+    }
+  ],
+  "outputs": {
+
+  }
+}
